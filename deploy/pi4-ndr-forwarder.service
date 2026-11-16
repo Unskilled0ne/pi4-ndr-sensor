@@ -1,0 +1,18 @@
+[Unit]
+Description=Pi4 NDR Sensor Log Forwarder Daemon
+After=network.target suricata.service zeek.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pi4-ndr-sensor
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/pi4-ndr-sensor/venv/bin/python3 /opt/pi4-ndr-sensor/run_forwarder.py run -c /etc/pi4-ndr/forwarder.yaml
+Restart=always
+RestartSec=5
+Nice=5
+MemoryMax=350M
+
+[Install]
+WantedBy=multi-user.target

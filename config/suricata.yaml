@@ -1,0 +1,149 @@
+%YAML 1.1
+---
+# Suricata Configuration optimized for Raspberry Pi 4 (4GB RAM)
+# Passive NIDS mode on Gigabit Ethernet interface (SPAN port)
+
+vars:
+  address-groups:
+    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+    SMTP_SERVERS: "$HOME_NET"
+    SQL_SERVERS: "$HOME_NET"
+    DNS_SERVERS: "$HOME_NET"
+
+default-log-dir: /var/log/suricata
+
+stats:
+  enabled: yes
+  interval: 60
+
+outputs:
+  - fast:
+      enabled: no
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      pcap-file: false
+      community-id: true
+      community-id-seed: 0
+      types:
+        - alert:
+            payload: no
+            payload-buffer-size: 4kb
+            payload-printable: yes
+            packet: no
+            metadata: yes
+            tagged-packets: no
+        - anomaly:
+            enabled: yes
+            types:
+              decode: no
+              stream: yes
+              applayer: yes
+        - http:
+            extended: yes
+        - dns:
+            version: 2
+        - tls:
+            extended: yes
+        - flow
+
+# AF_PACKET capture method optimized for single gigabit NIC (eth0)
+af-packet:
+  - interface: eth0
+    threads: 1
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    mmap-locked: no
+    tpacket-v3: yes
+    ring-size: 2048
+    block-size: 65536
+    buffer-size: 64512
+
+# Threading and CPU affinity: Pin Suricata to Core 1, leaving Cores 0, 2, 3 for OS & Zeek
+threading:
+  set-cpu-affinity: yes
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [ 1 ]
+    - receive-cpu-set:
+        cpu: [ 1 ]
+    - worker-cpu-set:
+        cpu: [ 1 ]
+
+# Memory-conscious flow engine limits for 4GB RAM ceiling
+flow:
+  memcap: 128mb
+  hash-size: 65536
+  prealloc: 10000
+  emergency-recovery: 30
+
+flow-timeouts:
+  default:
+    new: 15
+    established: 300
+    closed: 0
+    bypassed: 100
+    emergency-new: 5
+    emergency-established: 100
+    emergency-closed: 0
+  tcp:
+    new: 15
+    established: 300
+    closed: 10
+    emergency-new: 5
+    emergency-established: 100
+    emergency-closed: 5
+  udp:
+    new: 15
+    established: 30
+    emergency-new: 5
+    emergency-established: 10
+
+stream:
+  memcap: 256mb
+  checksum-validation: no
+  inline: no
+  reassembly:
+    memcap: 256mb
+    depth: 1mb
+    toserver-chunk-size: 2560
+    toclient-chunk-size: 2560
+
+# Rules layout: pointing to the trimmed ET Open ruleset
+default-rule-path: /etc/suricata/rules
+rule-files:
+  - pi4-trimmed.rules
+
+app-layer:
+  protocols:
+    tls:
+      enabled: yes
+      detection-ports:
+        dp: 443
+    http:
+      enabled: yes
+      memcap: 128mb
+    dns:
+      tcp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+      udp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+    smtp:
+      enabled: no
+    ftp:
+      enabled: no
+    ssh:
+      enabled: yes
+    smb:
+      enabled: no
+    dcerpc:
+      enabled: no

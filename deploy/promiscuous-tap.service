@@ -1,0 +1,11 @@
+[Unit]
+Description=Configure Network Interface in Silent Promiscuous Mode for SPAN/TAP
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/ip link set eth0 promisc on arp off up
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
