@@ -11,7 +11,7 @@ import argparse
 import urllib.request
 import tarfile
 import re
-from typing import Set, Dict, List
+from typing import Set, Dict, List, Any
 
 DEFAULT_ENABLED_CATEGORIES = {
     "emerging-exploit",
