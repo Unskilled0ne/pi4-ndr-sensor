@@ -19,30 +19,25 @@ logs:
       - "notice.log"
 
 state:
-  offset_file: "/var/run/pi4-ndr/offset_state.json"
+  offset_file: "/var/lib/pi4-ndr/offset_state.json"
 
 forwarding:
-  # Destination endpoint: external SOAR or webhook receiver
   endpoint_url: "http://127.0.0.1:8000/api/v1/alerts/investigate"
-  # Mode options:
-  # - "ndr_spec": matches Section 5 of the architecture spec
-  # - "aegis_soar": formats directly into Aegis-SOAR SecurityAlert schema
   mode: "aegis_soar"
   batch_size: 50
+  max_queue_size: 5000
   flush_interval_seconds: 2.0
   timeout_seconds: 5.0
   max_retries: 3
   backoff_factor: 1.5
   auth:
-    type: "bearer" # "bearer", "api_key", or "none"
+    type: "bearer"
     token: ""
     header_name: "Authorization"
 
 filters:
-  # Forward all Suricata alerts
   always_forward_alerts: true
-  # Zeek sampling/filtering to prevent log bloat
-  zeek_forward_conn: false # set true if full connection metadata is needed
+  zeek_forward_conn: false
   zeek_forward_dns: true
   zeek_forward_http: true
   zeek_forward_ssl: true

@@ -1,7 +1,7 @@
 import os
 import yaml
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SensorInfo(BaseModel):
@@ -32,16 +32,30 @@ class AuthConfig(BaseModel):
     token: str = ""
     header_name: str = "Authorization"
 
+    @field_validator("token", "header_name")
+    @classmethod
+    def sanitize_headers(cls, v: str) -> str:
+        return v.replace("\r", "").replace("\n", "").strip()
+
 
 class ForwardingConfig(BaseModel):
     endpoint_url: str = "http://127.0.0.1:8000/api/v1/alerts/investigate"
-    mode: str = "aegis_soar"  # "aegis_soar" or "ndr_spec"
+    mode: str = "aegis_soar"
     batch_size: int = 50
+    max_queue_size: int = 5000
     flush_interval_seconds: float = 2.0
     timeout_seconds: float = 5.0
     max_retries: int = 3
     backoff_factor: float = 1.5
     auth: AuthConfig = Field(default_factory=AuthConfig)
+
+    @field_validator("endpoint_url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        clean = v.strip()
+        if not (clean.startswith("http://") or clean.startswith("https://")):
+            raise ValueError("endpoint_url must start with http:// or https://")
+        return clean
 
 
 class FiltersConfig(BaseModel):
@@ -54,7 +68,7 @@ class FiltersConfig(BaseModel):
 
 
 class StateConfig(BaseModel):
-    offset_file: str = "/var/run/pi4-ndr/offset_state.json"
+    offset_file: str = "/var/lib/pi4-ndr/offset_state.json"
 
 
 class AppConfig(BaseModel):

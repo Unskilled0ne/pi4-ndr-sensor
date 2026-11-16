@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""
-Synthetic Telemetry Generator for NDR Testing
-Simulates Suricata eve.json alerts and Zeek protocol logs to verify the
-normalization pipeline, batch queue, and forwarder without requiring a physical SPAN port.
-"""
-
 import os
 import sys
 import time
@@ -42,17 +36,15 @@ def generate_synthetic_suricata_alert(eve_file_path: str):
         }
     }
 
-    os.makedirs(os.path.dirname(eve_file_path), exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(eve_file_path)), exist_ok=True)
     with open(eve_file_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(alert_record) + "\n")
-    print(f"[✔] Appended synthetic Suricata alert -> {eve_file_path}")
 
 
 def generate_synthetic_zeek_logs(zeek_dir: str):
     os.makedirs(zeek_dir, exist_ok=True)
     ts = time.time()
 
-    # 1. DNS Log
     dns_record = {
         "ts": ts,
         "uid": "CHz6341SZk",
@@ -69,7 +61,6 @@ def generate_synthetic_zeek_logs(zeek_dir: str):
     with open(os.path.join(zeek_dir, "dns.log"), "a", encoding="utf-8") as f:
         f.write(json.dumps(dns_record) + "\n")
 
-    # 2. Notice Log
     notice_record = {
         "ts": ts,
         "note": "Scan::Port_Scan",
@@ -81,8 +72,6 @@ def generate_synthetic_zeek_logs(zeek_dir: str):
     }
     with open(os.path.join(zeek_dir, "notice.log"), "a", encoding="utf-8") as f:
         f.write(json.dumps(notice_record) + "\n")
-
-    print(f"[✔] Appended synthetic Zeek DNS and Notice logs -> {zeek_dir}")
 
 
 def main():

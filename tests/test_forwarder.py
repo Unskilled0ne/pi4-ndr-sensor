@@ -24,13 +24,6 @@ def test_forwarder_batching_and_flush(tmp_path):
         severity="medium",
         signature="Test Alert 1"
     )
-    event2 = NDREvent(
-        sensor_id="pi4-01",
-        source="zeek",
-        event_type="notice",
-        severity="high",
-        signature="Test Notice 2"
-    )
 
     with patch.object(forwarder._session, "post") as mock_post:
         mock_resp = MagicMock()
@@ -38,7 +31,6 @@ def test_forwarder_batching_and_flush(tmp_path):
         mock_post.return_value = mock_resp
 
         forwarder.batch_queue.append(event1)
-        # 1 event < batch_size (2), manual flush
         assert len(forwarder.batch_queue) == 1
         success = forwarder.flush()
 
@@ -78,10 +70,32 @@ def test_forwarder_aegis_soar_mode(tmp_path):
 
         assert success is True
         assert forwarder.metrics.events_forwarded == 1
-        # Check payload sent
-        args, kwargs = mock_post.call_args
+        _, kwargs = mock_post.call_args
         payload = kwargs["json"]
         assert payload["source"] == "ndr-suricata"
         assert payload["severity"] == "CRITICAL"
         assert payload["source_ip"] == "1.2.3.4"
         assert payload["destination_ip"] == "5.6.7.8"
+
+
+def test_forwarder_queue_bounding(tmp_path):
+    config = AppConfig()
+    config.state.offset_file = str(tmp_path / "offset.json")
+    config.logs.suricata.enabled = False
+    config.logs.zeek.enabled = False
+    config.forwarding.max_queue_size = 3
+
+    forwarder = LogForwarder(config)
+
+    for i in range(5):
+        ev = NDREvent(
+            sensor_id="pi4-01",
+            source="suricata",
+            event_type="alert",
+            severity="low" if i < 3 else "high",
+            signature=f"Alert {i}"
+        )
+        forwarder._enqueue_event(ev)
+
+    assert len(forwarder.batch_queue) == 3
+    assert forwarder.metrics.events_dropped == 2

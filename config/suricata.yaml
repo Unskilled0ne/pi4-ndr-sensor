@@ -1,8 +1,5 @@
 %YAML 1.1
 ---
-# Suricata Configuration optimized for Raspberry Pi 4 (4GB RAM)
-# Passive NIDS mode on Gigabit Ethernet interface (SPAN port)
-
 vars:
   address-groups:
     HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
@@ -50,7 +47,6 @@ outputs:
             extended: yes
         - flow
 
-# AF_PACKET capture method optimized for single gigabit NIC (eth0)
 af-packet:
   - interface: eth0
     threads: 1
@@ -64,7 +60,6 @@ af-packet:
     block-size: 65536
     buffer-size: 64512
 
-# Threading and CPU affinity: Pin Suricata to Core 1, leaving Cores 0, 2, 3 for OS & Zeek
 threading:
   set-cpu-affinity: yes
   cpu-affinity:
@@ -75,7 +70,6 @@ threading:
     - worker-cpu-set:
         cpu: [ 1 ]
 
-# Memory-conscious flow engine limits for 4GB RAM ceiling
 flow:
   memcap: 128mb
   hash-size: 65536
@@ -114,7 +108,6 @@ stream:
     toserver-chunk-size: 2560
     toclient-chunk-size: 2560
 
-# Rules layout: pointing to the trimmed ET Open ruleset
 default-rule-path: /etc/suricata/rules
 rule-files:
   - pi4-trimmed.rules

@@ -59,7 +59,6 @@ def test_normalize_suricata_alert():
     assert event.dest_port == 80
     assert event.proto == "tcp"
 
-    # Test conversion to Aegis-SOAR format
     soar_alert = event.to_aegis_alert()
     assert soar_alert["source"] == "ndr-suricata"
     assert soar_alert["severity"] == "HIGH"
@@ -75,6 +74,40 @@ def test_normalize_suricata_filtered_types():
 def test_normalize_suricata_invalid_json():
     assert normalize_suricata("THIS IS NOT JSON {{{") is None
     assert normalize_suricata("") is None
+    assert normalize_suricata("x" * 600000) is None
+
+
+def test_url_sanitization_and_injection_defense():
+    event = NDREvent(
+        sensor_id="test-01",
+        source="suricata",
+        event_type="http",
+        raw={
+            "http": {
+                "hostname": "attacker.com\r\n",
+                "url": "/malicious\npath"
+            }
+        }
+    )
+    alert = event.to_aegis_alert()
+    assert len(alert["extracted_urls"]) == 1
+    assert alert["extracted_urls"][0] == "http://attacker.com/maliciouspath"
+    assert "\r" not in alert["extracted_urls"][0]
+    assert "\n" not in alert["extracted_urls"][0]
+
+    bad_event = NDREvent(
+        sensor_id="test-01",
+        source="suricata",
+        event_type="http",
+        raw={
+            "http": {
+                "hostname": "javascript:alert(1)",
+                "url": ""
+            }
+        }
+    )
+    bad_alert = bad_event.to_aegis_alert()
+    assert len(bad_alert["extracted_urls"]) == 0
 
 
 def test_normalize_zeek_dns():
@@ -116,7 +149,7 @@ def test_normalize_zeek_notice_escalation():
     assert event is not None
     assert event.source == "zeek"
     assert event.event_type == "notice"
-    assert event.severity == "critical"  # contains 'alarm'
+    assert event.severity == "critical"
     assert event.signature == "Scan::Port_Scan"
 
 

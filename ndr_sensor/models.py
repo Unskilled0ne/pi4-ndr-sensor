@@ -1,13 +1,14 @@
+import re
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Literal, List
 from pydantic import BaseModel, Field
-import uuid
+
+SAFE_HOST_PATTERN = re.compile(r"^[a-zA-Z0-9.\-]+(:[0-9]{1,5})?$")
+SAFE_URL_PATTERN = re.compile(r"^https?://[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+$")
 
 
 class NDREvent(BaseModel):
-    """
-    Normalized alert schema defined in Section 5 of the Pi4 NDR Sensor Spec.
-    """
     sensor_id: str = "pi4-ndr-01"
     source: Literal["suricata", "zeek"]
     event_type: Literal["alert", "conn", "dns", "http", "ssl", "notice", "flow", "tls"]
@@ -22,29 +23,31 @@ class NDREvent(BaseModel):
     raw: Dict[str, Any] = Field(default_factory=dict)
 
     def to_aegis_alert(self) -> Dict[str, Any]:
-        """
-        Converts the NDR event directly into the Aegis-SOAR SecurityAlert schema
-        expected by the /api/v1/alerts/investigate endpoint.
-        """
         alert_id = f"NDR-{uuid.uuid4().hex[:8].upper()}"
-
-        # Map severity to Aegis-SOAR format (LOW, MEDIUM, HIGH, CRITICAL)
         soar_severity = self.severity.upper()
 
         rule_id = None
         if self.source == "suricata":
-            rule_id = str(self.raw.get("alert", {}).get("signature_id", "SURICATA-ALERT"))
+            sig_id = self.raw.get("alert", {}).get("signature_id")
+            rule_id = str(sig_id) if sig_id is not None else "SURICATA-ALERT"
         elif self.source == "zeek":
             rule_id = f"ZEEK-{self.event_type.upper()}"
 
-        description = self.signature or f"NDR Telemetry Event [{self.source.upper()}:{self.event_type.upper()}]"
+        description = self.signature or f"[{self.source.upper()}:{self.event_type.upper()}] Telemetry"
 
         extracted_urls = []
         if self.event_type == "http":
             hostname = self.raw.get("http", {}).get("hostname") or self.raw.get("host")
             uri = self.raw.get("http", {}).get("url") or self.raw.get("uri", "/")
-            if hostname:
-                extracted_urls.append(f"http://{hostname}{uri}")
+            if hostname and isinstance(hostname, str) and isinstance(uri, str):
+                cleaned_host = re.sub(r"[\r\n\t]", "", hostname).strip()
+                cleaned_uri = re.sub(r"[\r\n\t]", "", uri).strip()
+                if not cleaned_uri.startswith("/"):
+                    cleaned_uri = f"/{cleaned_uri}"
+                if SAFE_HOST_PATTERN.match(cleaned_host):
+                    candidate_url = f"http://{cleaned_host}{cleaned_uri}"
+                    if SAFE_URL_PATTERN.match(candidate_url) and len(candidate_url) <= 2048:
+                        extracted_urls.append(candidate_url)
 
         return {
             "alert_id": alert_id,

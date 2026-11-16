@@ -1,13 +1,24 @@
 import os
+import tarfile
 import pytest
-from deploy.rules_pruner import prune_rules
+from deploy.rules_pruner import prune_rules, is_safe_tar_member
+
+
+def test_is_safe_tar_member():
+    m_ok = tarfile.TarInfo(name="rules/emerging-exploit.rules")
+    assert is_safe_tar_member(m_ok) is True
+
+    m_bad1 = tarfile.TarInfo(name="../etc/passwd")
+    assert is_safe_tar_member(m_bad1) is False
+
+    m_bad2 = tarfile.TarInfo(name="/etc/shadow")
+    assert is_safe_tar_member(m_bad2) is False
 
 
 def test_rules_pruner_filtering(tmp_path):
     rules_dir = tmp_path / "rules"
     rules_dir.mkdir()
 
-    # Rule in enabled category
     exploit_file = rules_dir / "emerging-exploit.rules"
     exploit_file.write_text(
         '# Some comment\n'
@@ -16,7 +27,6 @@ def test_rules_pruner_filtering(tmp_path):
         encoding="utf-8"
     )
 
-    # Rule in disabled category (SCADA)
     scada_file = rules_dir / "emerging-scada.rules"
     scada_file.write_text(
         'alert tcp any any -> $HOME_NET 502 (msg:"ET SCADA Modbus Read"; sid:2003; rev:1;)\n',

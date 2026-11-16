@@ -47,11 +47,9 @@ def test_end_to_end_pipeline(tmp_path, mock_server):
     zeek_dir = tmp_path / "zeek"
     offset_file = tmp_path / "offset.json"
 
-    # Write synthetic telemetry
     generate_synthetic_suricata_alert(str(eve_file))
     generate_synthetic_zeek_logs(str(zeek_dir))
 
-    # Configure forwarder to ingest synthetic telemetry and forward to mock server
     config = AppConfig()
     config.sensor.id = "test-pi4-ndr"
     config.state.offset_file = str(offset_file)
@@ -68,17 +66,14 @@ def test_end_to_end_pipeline(tmp_path, mock_server):
 
     forwarder = LogForwarder(config)
 
-    # Poll and flush
     new_count = forwarder.poll_once()
-    assert new_count >= 2  # At least suricata alert + zeek notice/dns
+    assert new_count >= 2
 
     forwarder.flush()
 
-    # Verify mock server received requests
     assert len(MockServerHandler.received_requests) >= 2
     alert_sources = [r.get("source") for r in MockServerHandler.received_requests]
     assert "ndr-suricata" in alert_sources
     assert "ndr-zeek" in alert_sources
 
-    # Verify state saved
     assert os.path.exists(str(offset_file))

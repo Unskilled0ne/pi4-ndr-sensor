@@ -1,11 +1,12 @@
 [Unit]
-Description=Pi4 NDR Sensor Log Forwarder Daemon
+Description=NDR Telemetry Forwarder Daemon
 After=network.target suricata.service zeek.service
 Wants=network.target
 
 [Service]
 Type=simple
-User=root
+User=ndrsensor
+Group=ndrsensor
 WorkingDirectory=/opt/pi4-ndr-sensor
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/pi4-ndr-sensor/venv/bin/python3 /opt/pi4-ndr-sensor/run_forwarder.py run -c /etc/pi4-ndr/forwarder.yaml
@@ -13,6 +14,23 @@ Restart=always
 RestartSec=5
 Nice=5
 MemoryMax=350M
+
+# Security Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/pi4-ndr
+ReadOnlyPaths=/var/log/suricata /var/log/zeek /etc/pi4-ndr /opt/pi4-ndr-sensor
 
 [Install]
 WantedBy=multi-user.target

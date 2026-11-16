@@ -24,15 +24,15 @@ def cmd_run(args):
 def cmd_test_config(args):
     try:
         config = AppConfig.load(args.config)
-        print("✔ Configuration file successfully loaded and validated.")
-        print(f"  Sensor ID: {config.sensor.id}")
-        print(f"  Forwarding Endpoint: {config.forwarding.endpoint_url}")
-        print(f"  Mode: {config.forwarding.mode}")
-        print(f"  Suricata Log Path: {config.logs.suricata.path}")
-        print(f"  Zeek Log Directory: {config.logs.zeek.dir}")
-        print(f"  Offset File: {config.state.offset_file}")
+        print("[+] Configuration valid:")
+        print(f"    Sensor: {config.sensor.id}")
+        print(f"    Endpoint: {config.forwarding.endpoint_url}")
+        print(f"    Mode: {config.forwarding.mode}")
+        print(f"    Suricata Path: {config.logs.suricata.path}")
+        print(f"    Zeek Directory: {config.logs.zeek.dir}")
+        print(f"    State File: {config.state.offset_file}")
     except Exception as e:
-        print(f"❌ Configuration error: {e}", file=sys.stderr)
+        print(f"[-] Config error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -61,28 +61,26 @@ def cmd_test_send(args):
         }
     )
 
-    print(f"Dispatching test alert to {config.forwarding.endpoint_url} (mode: {config.forwarding.mode})...")
     forwarder.batch_queue.append(test_event)
     success = forwarder.flush()
     if success:
-        print("✔ Test alert dispatched successfully!")
+        print("[+] Test alert delivered successfully.")
     else:
-        print("❌ Test alert dispatch failed. Check endpoint status and logs.", file=sys.stderr)
+        print("[-] Alert delivery failed.", file=sys.stderr)
         sys.exit(1)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Raspberry Pi 4 NDR Telemetry Sensor CLI")
+    parser = argparse.ArgumentParser(description="NDR Sensor Forwarder Daemon")
     parser.add_argument("-c", "--config", help="Path to forwarder.yaml", default=None)
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
 
-    subparsers = parser.add_subparsers(dest="subcommand", help="Available subcommands")
-
-    run_p = subparsers.add_parser("run", help="Start the NDR log forwarder daemon")
+    subparsers = parser.add_subparsers(dest="subcommand")
+    run_p = subparsers.add_parser("run", help="Start log forwarder")
     run_p.add_argument("--poll-interval", type=float, default=0.5, help="Polling interval in seconds")
 
-    subparsers.add_parser("test-config", help="Validate configuration file")
-    subparsers.add_parser("test-send", help="Send a test alert through the pipeline")
+    subparsers.add_parser("test-config", help="Validate configuration")
+    subparsers.add_parser("test-send", help="Send test alert to endpoint")
 
     args = parser.parse_args()
     setup_logging(args.verbose)

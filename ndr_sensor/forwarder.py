@@ -36,11 +36,6 @@ class TelemetryMetrics:
 
 
 class LogForwarder:
-    """
-    Core daemon engine: coordinates log tailers, schema normalization,
-    in-memory batching, and resilient HTTP dispatch to the SOAR pipeline.
-    """
-
     def __init__(self, config: Optional[AppConfig] = None):
         self.config = config or AppConfig.load()
         self.metrics = TelemetryMetrics()
@@ -67,12 +62,10 @@ class LogForwarder:
         return session
 
     def _init_tailers(self) -> None:
-        # 1. Suricata tailer
         if self.config.logs.suricata.enabled:
             s_path = self.config.logs.suricata.path
             self.tailers["suricata"] = FileTailer(s_path, self.state_tracker)
 
-        # 2. Zeek tailers
         if self.config.logs.zeek.enabled:
             z_dir = self.config.logs.zeek.dir
             for z_file in self.config.logs.zeek.files:
@@ -101,11 +94,24 @@ class LogForwarder:
 
         return True
 
+    def _enqueue_event(self, event: NDREvent) -> None:
+        max_q = self.config.forwarding.max_queue_size
+        if len(self.batch_queue) >= max_q:
+            # Drop lowest severity event to protect memory
+            for i, queued in enumerate(self.batch_queue):
+                if queued.severity == "low":
+                    self.batch_queue.pop(i)
+                    self.metrics.events_dropped += 1
+                    break
+            else:
+                self.batch_queue.pop(0)
+                self.metrics.events_dropped += 1
+
+        self.batch_queue.append(event)
+
     def poll_once(self) -> int:
-        """Polls all active log tailers, normalizes events, and queues them."""
         new_events_count = 0
 
-        # Poll Suricata
         if "suricata" in self.tailers:
             for line in self.tailers["suricata"].read_new_lines():
                 self.metrics.events_read += 1
@@ -117,12 +123,11 @@ class LogForwarder:
                 if event:
                     self.metrics.events_normalized += 1
                     if self._should_forward(event):
-                        self.batch_queue.append(event)
+                        self._enqueue_event(event)
                         new_events_count += 1
                     else:
                         self.metrics.events_dropped += 1
 
-        # Poll Zeek files
         for key, tailer in self.tailers.items():
             if not key.startswith("zeek:"):
                 continue
@@ -137,12 +142,11 @@ class LogForwarder:
                 if event:
                     self.metrics.events_normalized += 1
                     if self._should_forward(event):
-                        self.batch_queue.append(event)
+                        self._enqueue_event(event)
                         new_events_count += 1
                     else:
                         self.metrics.events_dropped += 1
 
-        # Check flush conditions
         elapsed = time.time() - self.last_flush_time
         if len(self.batch_queue) >= self.config.forwarding.batch_size or (self.batch_queue and elapsed >= self.config.forwarding.flush_interval_seconds):
             self.flush()
@@ -150,49 +154,49 @@ class LogForwarder:
         return new_events_count
 
     def flush(self) -> bool:
-        """Flushes the queued batch to the configured SOAR endpoint."""
         if not self.batch_queue:
             return True
 
-        to_send = list(self.batch_queue)
+        to_send = list(self.batch_queue[:self.config.forwarding.batch_size])
         mode = self.config.forwarding.mode
         endpoint = self.config.forwarding.endpoint_url
         headers = {"Content-Type": "application/json"}
 
-        # Configure Auth Header
         auth = self.config.forwarding.auth
         if auth.token:
+            safe_token = auth.token.replace("\r", "").replace("\n", "").strip()
+            safe_header = auth.header_name.replace("\r", "").replace("\n", "").strip()
             if auth.type == "bearer":
-                headers[auth.header_name] = f"Bearer {auth.token}"
+                headers[safe_header] = f"Bearer {safe_token}"
             elif auth.type == "api_key":
-                headers[auth.header_name] = auth.token
+                headers[safe_header] = safe_token
 
         success = True
+        timeout = (3.05, self.config.forwarding.timeout_seconds)
+
         try:
             if mode == "aegis_soar":
-                # Aegis-SOAR's /api/v1/alerts/investigate processes individual alerts
                 for event in to_send:
                     payload = event.to_aegis_alert()
                     resp = self._session.post(
                         endpoint,
                         json=payload,
                         headers=headers,
-                        timeout=self.config.forwarding.timeout_seconds
+                        timeout=timeout
                     )
                     if resp.status_code not in (200, 201, 202):
-                        logger.warning("Endpoint rejected alert: HTTP %d %s", resp.status_code, resp.text[:120])
+                        logger.warning("Endpoint returned status %d", resp.status_code)
                         success = False
             else:
-                # Standard §5 NDR spec schema batch
                 payload = [event.model_dump() for event in to_send]
                 resp = self._session.post(
                     endpoint,
                     json=payload,
                     headers=headers,
-                    timeout=self.config.forwarding.timeout_seconds
+                    timeout=timeout
                 )
                 if resp.status_code not in (200, 201, 202):
-                    logger.warning("Batch dispatch rejected: HTTP %d %s", resp.status_code, resp.text[:120])
+                    logger.warning("Endpoint returned status %d", resp.status_code)
                     success = False
 
             if success:
@@ -207,20 +211,18 @@ class LogForwarder:
                 return False
 
         except Exception as e:
-            logger.error("HTTP dispatch exception to %s: %s", endpoint, e)
+            logger.error("HTTP dispatch failure: %s", type(e).__name__)
             self.metrics.dispatch_errors += 1
             return False
 
     def run_loop(self, poll_interval: float = 0.5) -> None:
-        """Starts main daemon loop."""
         self.is_running = True
-        logger.info("Starting Pi4 NDR Sensor Forwarder [Sensor: %s, Mode: %s]", self.config.sensor.id, self.config.forwarding.mode)
+        logger.info("Forwarder started: sensor=%s mode=%s", self.config.sensor.id, self.config.forwarding.mode)
         try:
             while self.is_running:
                 self.poll_once()
                 time.sleep(poll_interval)
         except KeyboardInterrupt:
-            logger.info("Shutdown requested. Flushing remaining telemetry...")
             self.stop()
 
     def stop(self) -> None:
@@ -228,4 +230,3 @@ class LogForwarder:
         self.flush()
         self.state_tracker.save()
         self._session.close()
-        logger.info("Forwarder stopped. Metrics: %s", self.metrics.as_dict())
