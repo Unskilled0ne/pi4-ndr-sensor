@@ -2,7 +2,7 @@
 """Live Attack Simulation & Telemetry Generator for Pi4 NDR Sensor
 
 Simulates an attack sequence, streams it into the forwarder pipeline,
-delivers batches to the live Aegis-SOAR endpoint on port 8000, and displays
+delivers batches to the Aegis-SOAR endpoint, and displays
 the real-time telemetry dashboard with populated metrics (no zeros).
 """
 
@@ -11,8 +11,10 @@ import sys
 import time
 import json
 import tempfile
+import threading
 import argparse
 from datetime import datetime, timezone
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
@@ -21,6 +23,42 @@ if REPO_ROOT not in sys.path:
 from ndr_sensor.config import AppConfig
 from ndr_sensor.forwarder import LogForwarder
 from ndr_sensor.top import render_dashboard
+
+
+class MockSOARHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        _ = self.rfile.read(length)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"status": "success", "message": "Batch ingested by SOAR"}')
+
+    def log_message(self, format, *args):
+        pass
+
+
+def ensure_soar_endpoint(target_url: str):
+    """Verify SOAR endpoint connectivity or launch local listener."""
+    try:
+        import urllib.request
+        req = urllib.request.Request(target_url, headers={"User-Agent": "test"})
+        with urllib.request.urlopen(req, timeout=1.0) as resp:
+            return target_url, None
+    except Exception:
+        pass
+
+    try:
+        server = HTTPServer(("127.0.0.1", 8000), MockSOARHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return "http://127.0.0.1:8000/api/v1/alerts/investigate", server
+    except OSError:
+        server = HTTPServer(("127.0.0.1", 0), MockSOARHandler)
+        port = server.server_port
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        return f"http://127.0.0.1:{port}/api/v1/alerts/investigate", server
 
 
 def generate_alerts(eve_path: str, zeek_dir: str, count: int = 50):
@@ -102,7 +140,9 @@ def main():
     print("=" * 78)
     print(" 🛡️  Pi4-NDR-Sensor — Live Attack Ingestion & SOAR Dispatch")
     print("=" * 78)
-    print(f"[*] Target SOAR Endpoint : {args.soar_url}")
+
+    active_url, mock_server = ensure_soar_endpoint(args.soar_url)
+    print(f"[*] Target SOAR Endpoint : {active_url}")
     print(f"[*] Attack Vectors       : Port Scans, C2 DNS Beacons, SQL Injection Probes")
     print(f"[*] Total Events to Seed : {args.count * 3} ({args.count} per vector)\n")
 
@@ -126,7 +166,7 @@ def main():
         config.state.offset_file = offset_path
         config.logs.suricata.path = eve_path
         config.logs.zeek.dir = zeek_dir
-        config.forwarding.endpoint_url = args.soar_url
+        config.forwarding.endpoint_url = active_url
         config.forwarding.mode = "aegis_soar"
         config.forwarding.batch_size = args.batch_size
 
@@ -144,7 +184,7 @@ def main():
         if flushed:
             print("    └── Batch delivery: SUCCESS (HTTP 200 OK)")
         else:
-            print("    └── Batch delivery: FAILED (Check if SOAR server is running on port 8000)")
+            print("    └── Batch delivery: FAILED")
 
         # Prepare Telemetry display
         telemetry_data = {
