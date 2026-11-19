@@ -1,0 +1,125 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Events Forwarded (Total)",
+      "type": "stat",
+      "targets": [
+        { "expr": "ndr_events_forwarded", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "title": "Batches Sent",
+      "type": "stat",
+      "targets": [
+        { "expr": "ndr_batches_sent", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "title": "Events Dropped",
+      "type": "stat",
+      "targets": [
+        { "expr": "ndr_events_dropped", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "title": "Dispatch Errors",
+      "type": "stat",
+      "targets": [
+        { "expr": "ndr_dispatch_errors", "refId": "A" }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "title": "Telemetry Throughput Rate (Events/sec)",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(ndr_events_read[1m])", "legendFormat": "Read Rate", "refId": "A" },
+        { "expr": "rate(ndr_events_normalized[1m])", "legendFormat": "Normalized Rate", "refId": "B" },
+        { "expr": "rate(ndr_events_forwarded[1m])", "legendFormat": "Forwarded Rate", "refId": "C" }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "title": "Forwarding Errors & Drops",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "rate(ndr_events_dropped[1m])", "legendFormat": "Dropped Events/s", "refId": "A" },
+        { "expr": "rate(ndr_dispatch_errors[1m])", "legendFormat": "Dispatch Errors/s", "refId": "B" }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["pi4-ndr", "suricata", "zeek", "network-security"],
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Raspberry Pi 4 NDR Sensor — Telemetry & Performance",
+  "version": 1
+}

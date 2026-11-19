@@ -75,16 +75,22 @@ The sensor passively monitors network traffic via a switch **SPAN / mirror port*
 
 - **Hardware-Conscious Memory Budget (< 3.0 GB RAM total):**
   - **Suricata:** Configured with single-worker `AF_PACKET` ring buffers, memory-capped flow/stream reassembly tables, and pinned to CPU Core 1.
-  - **Trimmed Ruleset:** Automated rule optimizer (`deploy/rules_pruner.py`) trims the 35,000+ rule ET Open set down to ~3,000 high-priority exploit, malware, scan, and web rules, avoiding multi-gigabyte memory inflation.
+  - **Trimmed Ruleset:** Automated rule optimizer (`deploy/rules_pruner.py`) trims the 35,000+ rule ET Open set down to ~3,000 high-priority exploit, malware, scan, and web rules with SHA256 integrity verification, avoiding multi-gigabyte memory inflation.
   - **Zeek:** Custom `local.zeek` policy disables memory-intensive enterprise protocol analyzers (SMB, Kerberos, DCE-RPC, Radius) and uses JSON output format.
-  - **Forwarder Daemon:** Consumes less than **40 MB RAM**, replacing heavyweight forwarders like Filebeat or Logstash.
-- **Rotation-Aware State Persistence:**  
-  The log tailer automatically detects log rotations (inode changes) and file truncations, maintaining offset markers in `offset_state.json` to guarantee zero duplicate alerts and zero missing logs across reboots.
+  - **Forwarder Daemon:** Consumes less than **40 MB RAM**, replacing heavyweight forwarders like Filebeat or Logstash with a pooled HTTP session (`pool_maxsize=2`).
+- **Rotation-Aware State Persistence & Reliability:**  
+  The log tailer automatically detects log rotations (inode changes) and file truncations, maintaining offset markers in `offset_state.json` to guarantee zero duplicate alerts and zero missing logs across reboots. Bounded batch queues drop lowest-severity events if saturated, and dead-letter protection prevents head-of-line blocking on repeated dispatch errors.
+- **Local Alert Deduplication:**  
+  An in-memory sliding-window cache (`AlertDeduplicator`) automatically throttles repeating signature/IP tuples within a configurable window (default 60s) to keep bandwidth and SOAR ingestion clean under high-volume flood conditions.
+- **Threat Intel IOC Enrichment:**  
+  Integrates a local IOC lookup table (`IOCBlocklist`) loaded from daily automated feeds (`scripts/update_threat_intel.sh`), dynamically escalating inbound and outbound alert severities on true matches.
 - **MicroSD Preservation via External Storage:**  
   Includes automated storage provisioning (`deploy/setup_storage.sh`) to route high-write directories (`/var/log/suricata` and `/var/log/zeek`) onto an external USB3 SSD or hard drive with daily compression logrotate scripts.
+- **Production Observability & Systemd Watchdog:**  
+  Built-in `/health` JSON monitoring endpoint (default port 9100) reporting uptime, queue depth, NIC statistics, and metrics. Exports live Prometheus textfile metrics (`/var/lib/pi4-ndr/metrics.prom`) and supports systemd `Type=notify` hardware watchdog restarts (`WatchdogSec=30`).
 - **Dual Dispatch Modes:**  
   - `ndr_spec`: Emits the normalized 10-field telemetry schema defined in the architecture specification.
-  - `aegis_soar`: Formats events directly into native `SecurityAlert` models for automated triage by [Aegis-SOAR](https://github.com/Unskilled0ne/aegis-soar).
+  - `aegis_soar`: Batches and formats events directly into native `SecurityAlert` models for automated triage by [Aegis-SOAR](https://github.com/Unskilled0ne/aegis-soar).
 
 ---
 
@@ -170,6 +176,14 @@ sudo systemctl start suricata
 sudo systemctl start pi4-ndr-forwarder
 ```
 
+### 5. Monitor Live Sensor Telemetry (`pi4-ndr top`)
+Launch the terminal monitor dashboard to view live packet counts, queue utilization, and forwarding metrics:
+```bash
+python3 run_forwarder.py top
+# Or one-shot snapshot
+python3 run_forwarder.py top --once
+```
+
 ---
 
 ## 🧪 Testing & Verification
@@ -180,14 +194,14 @@ The repository includes a standalone test harness to validate log parsing, batch
 # 1. Run full unit and integration test suite
 python3 -m pytest tests/ -v
 
-# 2. Test configuration syntax
+# 2. Run end-to-end attack simulation (Recon -> C2 -> Exploit -> Batch Dispatch)
+python3 scripts/simulate_attack_pipeline.py
+
+# 3. Test configuration syntax
 python3 run_forwarder.py test-config -c config/forwarder.yaml
 
-# 3. Spin up local mock SOAR endpoint
-python3 scripts/mock_soar_server.py 8000 &
-
-# 4. Generate synthetic Suricata and Zeek alerts
-python3 scripts/test_traffic_generator.py /tmp/test_eve.json /tmp/test_zeek
+# 4. Optional: Provision MicroSD-preserving RAM disk (tmpfs) if running without an external SSD
+sudo ./deploy/setup_ram_storage.sh 256M
 ```
 
 ---

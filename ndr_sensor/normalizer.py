@@ -83,6 +83,13 @@ def normalize_suricata(
     if allowed_types and event_type not in allowed_types:
         return None
 
+    if event_type == "stats":
+        capture = record.get("stats", {}).get("capture", {})
+        kernel_drops = capture.get("kernel_drops", 0)
+        if isinstance(kernel_drops, int) and kernel_drops > 0:
+            logger.warning("Suricata kernel drops detected: %d", kernel_drops)
+        return None
+
     valid_types = {"alert", "conn", "dns", "http", "ssl", "notice", "flow", "tls"}
     normalized_type = event_type if event_type in valid_types else "alert"
 

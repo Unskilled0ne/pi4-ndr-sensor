@@ -5,6 +5,7 @@ import argparse
 import urllib.request
 import tarfile
 import re
+import hashlib
 from typing import Set, Dict, List, Any
 
 DEFAULT_ENABLED_CATEGORIES = {
@@ -113,6 +114,25 @@ def main():
         tar_dest = "/tmp/emerging.rules.tar.gz"
         try:
             urllib.request.urlretrieve(ET_OPEN_URL, tar_dest)
+            # Attempt hash verification
+            try:
+                sha_url = ET_OPEN_URL + ".sha256"
+                sha_dest = "/tmp/emerging.rules.tar.gz.sha256"
+                urllib.request.urlretrieve(sha_url, sha_dest)
+                with open(sha_dest, "r") as f:
+                    expected_hash = f.read().strip().split()[0].lower()
+                sha256 = hashlib.sha256()
+                with open(tar_dest, "rb") as f:
+                    for chunk in iter(lambda: f.read(65536), b""):
+                        sha256.update(chunk)
+                actual_hash = sha256.hexdigest().lower()
+                if actual_hash != expected_hash:
+                    print(f"[-] SHA256 mismatch! Expected {expected_hash}, got {actual_hash}", file=sys.stderr)
+                    print("[-] Refusing to use potentially tampered ruleset", file=sys.stderr)
+                    sys.exit(1)
+                print(f"[+] SHA256 verified: {actual_hash}")
+            except Exception as e:
+                print(f"[!] Could not verify hash (continuing anyway): {e}", file=sys.stderr)
             input_path = tar_dest
         except Exception as e:
             print(f"[-] Download failed: {e}", file=sys.stderr)

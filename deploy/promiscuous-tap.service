@@ -1,10 +1,11 @@
 [Unit]
-Description=Configure Network Interface in Silent Promiscuous Mode for SPAN/TAP
+Description=Configure Network Interface in Silent Promiscuous Mode with Offloading Disabled for SPAN/TAP
 After=network.target
 
 [Service]
 Type=oneshot
 ExecStart=/sbin/ip link set eth0 promisc on arp off up
+ExecStartPost=-/sbin/ethtool -K eth0 tso off gso off gro off lro off rx off tx off rxvlan off txvlan off
 RemainAfterExit=yes
 
 [Install]

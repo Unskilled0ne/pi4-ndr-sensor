@@ -21,12 +21,17 @@ class MockSOARHandler(BaseHTTPRequestHandler):
 
         try:
             payload = json.loads(post_data.decode("utf-8"))
-            received_alerts.append(payload)
+            if isinstance(payload, list):
+                received_alerts.extend(payload)
+                count = len(payload)
+            else:
+                received_alerts.append(payload)
+                count = 1
 
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            response = {"status": "success", "alert_id": payload.get("alert_id", "TEST-01")}
+            response = {"status": "success", "count": count}
             self.wfile.write(json.dumps(response).encode("utf-8"))
         except Exception:
             self.send_response(400)

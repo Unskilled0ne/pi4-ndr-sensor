@@ -4,7 +4,8 @@ After=network.target suricata.service zeek.service
 Wants=network.target
 
 [Service]
-Type=simple
+Type=notify
+WatchdogSec=30
 User=ndrsensor
 Group=ndrsensor
 WorkingDirectory=/opt/pi4-ndr-sensor

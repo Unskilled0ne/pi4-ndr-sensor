@@ -18,6 +18,10 @@ def setup_logging(verbose: bool = False):
 def cmd_run(args):
     config = AppConfig.load(args.config)
     forwarder = LogForwarder(config)
+
+    from ndr_sensor.health import start_health_server
+    start_health_server(forwarder, port=getattr(args, "health_port", 9100))
+
     forwarder.run_loop(poll_interval=args.poll_interval)
 
 
@@ -25,7 +29,7 @@ def cmd_test_config(args):
     try:
         config = AppConfig.load(args.config)
         print("[+] Configuration valid:")
-        print(f"    Sensor: {config.sensor.id}")
+        print(f"    Sensor: {config.sensor.id} (interface: {config.sensor.interface})")
         print(f"    Endpoint: {config.forwarding.endpoint_url}")
         print(f"    Mode: {config.forwarding.mode}")
         print(f"    Suricata Path: {config.logs.suricata.path}")
@@ -71,16 +75,24 @@ def cmd_test_send(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="NDR Sensor Forwarder Daemon")
-    parser.add_argument("-c", "--config", help="Path to forwarder.yaml", default=None)
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
+    common_parser = argparse.ArgumentParser(add_help=False)
+    common_parser.add_argument("-c", "--config", help="Path to forwarder.yaml", default=None)
+    common_parser.add_argument("-v", "--verbose", action="store_true", help="Enable debug logging")
 
+    parser = argparse.ArgumentParser(description="NDR Sensor Forwarder Daemon", parents=[common_parser])
     subparsers = parser.add_subparsers(dest="subcommand")
-    run_p = subparsers.add_parser("run", help="Start log forwarder")
-    run_p.add_argument("--poll-interval", type=float, default=0.5, help="Polling interval in seconds")
 
-    subparsers.add_parser("test-config", help="Validate configuration")
-    subparsers.add_parser("test-send", help="Send test alert to endpoint")
+    run_p = subparsers.add_parser("run", help="Start log forwarder", parents=[common_parser])
+    run_p.add_argument("--poll-interval", type=float, default=0.5, help="Polling interval in seconds")
+    run_p.add_argument("--health-port", type=int, default=9100, help="Health endpoint port")
+
+    subparsers.add_parser("test-config", help="Validate configuration", parents=[common_parser])
+    subparsers.add_parser("test-send", help="Send test alert to endpoint", parents=[common_parser])
+
+    top_p = subparsers.add_parser("top", help="Launch real-time telemetry terminal monitor", parents=[common_parser])
+    top_p.add_argument("--port", type=int, default=9100, help="Health endpoint port")
+    top_p.add_argument("--interval", type=float, default=1.0, help="Refresh interval in seconds")
+    top_p.add_argument("--once", action="store_true", help="Print single snapshot and exit")
 
     args = parser.parse_args()
     setup_logging(args.verbose)
@@ -91,6 +103,10 @@ def main():
         cmd_test_config(args)
     elif args.subcommand == "test-send":
         cmd_test_send(args)
+    elif args.subcommand == "top":
+        from ndr_sensor.top import run_top
+        health_url = f"http://127.0.0.1:{args.port}/health"
+        run_top(health_url=health_url, interval=args.interval, once=args.once)
     else:
         parser.print_help()
 

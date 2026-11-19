@@ -2,12 +2,13 @@ sensor:
   id: "pi4-ndr-01"
   description: "Raspberry Pi 4 Passive NDR Sensor"
   network_zone: "perimeter-tap"
+  interface: "eth0"
 
 logs:
   suricata:
     enabled: true
     path: "/var/log/suricata/eve.json"
-    types: ["alert", "flow", "dns", "http", "tls"]
+    types: ["alert", "flow", "dns", "http", "tls", "stats"]
   zeek:
     enabled: true
     dir: "/var/log/zeek/current"
@@ -30,6 +31,8 @@ forwarding:
   timeout_seconds: 5.0
   max_retries: 3
   backoff_factor: 1.5
+  tls_verify: true
+  tls_ca_bundle: null
   auth:
     type: "bearer"
     token: ""
@@ -37,8 +40,13 @@ forwarding:
 
 filters:
   always_forward_alerts: true
+  suricata_forward_flow: false
+  suricata_forward_dns: true
+  suricata_forward_http: true
+  suricata_forward_tls: true
   zeek_forward_conn: false
   zeek_forward_dns: true
   zeek_forward_http: true
   zeek_forward_ssl: true
   zeek_forward_notice: true
+  dedup_window_seconds: 60.0

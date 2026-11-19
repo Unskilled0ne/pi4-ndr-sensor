@@ -20,7 +20,10 @@ class MockServerHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         data = self.rfile.read(length)
         payload = json.loads(data.decode("utf-8"))
-        MockServerHandler.received_requests.append(payload)
+        if isinstance(payload, list):
+            MockServerHandler.received_requests.extend(payload)
+        else:
+            MockServerHandler.received_requests.append(payload)
 
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

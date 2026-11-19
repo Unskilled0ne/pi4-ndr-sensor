@@ -46,6 +46,8 @@ outputs:
         - tls:
             extended: yes
         - flow
+        - stats:
+            threads: no
 
 af-packet:
   - interface: eth0

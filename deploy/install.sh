@@ -34,6 +34,18 @@ apt-get install -y --no-install-recommends \
     ethtool \
     logrotate
 
+# Install Zeek from official repository (Fix 6)
+if ! command -v zeek &>/dev/null; then
+    echo "[*] Installing Zeek..."
+    echo "deb [trusted=yes] https://download.opensuse.org/repositories/security:/zeek/Debian_12/ /" \
+        > /etc/apt/sources.list.d/zeek.list
+    apt-get update -y
+    apt-get install -y --no-install-recommends zeek-lts || {
+        echo "[!] Zeek package install failed. Install manually from https://zeek.org/get-zeek/"
+        echo "[!] Continuing without Zeek..."
+    }
+fi
+
 mkdir -p "${INSTALL_PREFIX}"
 cp -r "${PROJECT_DIR}"/* "${INSTALL_PREFIX}/"
 
@@ -55,17 +67,54 @@ fi
 cp "${INSTALL_PREFIX}/config/suricata.yaml" /etc/suricata/suricata.yaml
 chmod 644 /etc/suricata/suricata.yaml
 
+# Deploy Zeek site-local policy (Fix 7)
+ZEEK_SITE_DIR=""
+for candidate in /opt/zeek/share/zeek/site /usr/share/zeek/site /usr/local/zeek/share/zeek/site; do
+    if [ -d "${candidate}" ]; then
+        ZEEK_SITE_DIR="${candidate}"
+        break
+    fi
+done
+
+if [ -n "${ZEEK_SITE_DIR}" ]; then
+    if [ -f "${ZEEK_SITE_DIR}/local.zeek" ]; then
+        cp "${ZEEK_SITE_DIR}/local.zeek" "${ZEEK_SITE_DIR}/local.zeek.bak"
+    fi
+    cp "${INSTALL_PREFIX}/config/local.zeek" "${ZEEK_SITE_DIR}/local.zeek"
+    cp "${INSTALL_PREFIX}/config/dns-tunnel-detect.zeek" "${ZEEK_SITE_DIR}/dns-tunnel-detect.zeek"
+    chmod 644 "${ZEEK_SITE_DIR}/local.zeek" "${ZEEK_SITE_DIR}/dns-tunnel-detect.zeek"
+    echo "[+] Zeek site policy and DNS tunnel detector deployed to ${ZEEK_SITE_DIR}/"
+else
+    echo "[!] Zeek site directory not found. Deploy config/local.zeek manually."
+fi
+
 mkdir -p /etc/suricata/rules
 "${INSTALL_PREFIX}/venv/bin/python3" "${INSTALL_PREFIX}/deploy/rules_pruner.py" \
     -o /etc/suricata/rules/pi4-trimmed.rules \
     --download || true
 
+# Apply kernel and socket buffer tuning
+if [ -f "${INSTALL_PREFIX}/deploy/99-ndr-sensor.conf" ]; then
+    cp "${INSTALL_PREFIX}/deploy/99-ndr-sensor.conf" /etc/sysctl.d/99-ndr-sensor.conf
+    sysctl --system >/dev/null 2>&1 || true
+    echo "[+] Applied network buffer sysctl tuning."
+fi
+
 cp "${INSTALL_PREFIX}/deploy/promiscuous-tap.service" /etc/systemd/system/
 cp "${INSTALL_PREFIX}/deploy/pi4-ndr-forwarder.service" /etc/systemd/system/
+cp "${INSTALL_PREFIX}/deploy/pi4-ndr-rules-update.service" /etc/systemd/system/
+cp "${INSTALL_PREFIX}/deploy/pi4-ndr-rules-update.timer" /etc/systemd/system/
+
+# Template interface name from config (Fix 20)
+IFACE=$(grep -oP '(?<=interface: ).*' "${CONFIG_DIR}/forwarder.yaml" 2>/dev/null | tr -d '"' | head -1)
+IFACE="${IFACE:-eth0}"
+sed -i "s/eth0/${IFACE}/g" /etc/systemd/system/promiscuous-tap.service
 
 systemctl daemon-reload
 systemctl enable promiscuous-tap.service
 systemctl enable suricata.service
+systemctl enable zeek.service 2>/dev/null || true
 systemctl enable pi4-ndr-forwarder.service
+systemctl enable --now pi4-ndr-rules-update.timer 2>/dev/null || true
 
 echo "[+] Installation complete."

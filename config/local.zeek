@@ -7,6 +7,9 @@
 
 redef LogAscii::use_json = T;
 
+# JA3 TLS Client/Server Fingerprinting
+@load policy/protocols/ssl/ja3
+
 redef disable_analyzer += {
     PacketAnalyzer::ANALYZER_SMB,
     PacketAnalyzer::ANALYZER_KERBEROS,
@@ -22,3 +25,4 @@ redef udp_inactivity_timeout = 30 secs;
 redef table_expire_interval = 30 secs;
 
 @load policy/protocols/conn/community-id-logging
+@load ./dns-tunnel-detect.zeek

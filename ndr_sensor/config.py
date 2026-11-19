@@ -1,4 +1,5 @@
 import os
+import logging
 import yaml
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, field_validator
@@ -8,12 +9,13 @@ class SensorInfo(BaseModel):
     id: str = "pi4-ndr-01"
     description: str = "Raspberry Pi 4 Passive NDR Sensor"
     network_zone: str = "perimeter-tap"
+    interface: str = "eth0"
 
 
 class SuricataLogConfig(BaseModel):
     enabled: bool = True
     path: str = "/var/log/suricata/eve.json"
-    types: List[str] = ["alert", "flow", "dns", "http", "tls"]
+    types: List[str] = ["alert", "flow", "dns", "http", "tls", "stats"]
 
 
 class ZeekLogConfig(BaseModel):
@@ -32,10 +34,24 @@ class AuthConfig(BaseModel):
     token: str = ""
     header_name: str = "Authorization"
 
-    @field_validator("token", "header_name")
+    @field_validator("header_name")
     @classmethod
-    def sanitize_headers(cls, v: str) -> str:
+    def sanitize_header_name(cls, v: str) -> str:
         return v.replace("\r", "").replace("\n", "").strip()
+
+    @field_validator("token")
+    @classmethod
+    def resolve_and_sanitize_token(cls, v: str) -> str:
+        v = v.replace("\r", "").replace("\n", "").strip()
+        if v.startswith("${") and v.endswith("}"):
+            env_var = v[2:-1]
+            resolved = os.environ.get(env_var, "")
+            if not resolved:
+                logging.getLogger("ndr_sensor.config").warning(
+                    "Environment variable %s not set for auth token", env_var
+                )
+            return resolved
+        return v
 
 
 class ForwardingConfig(BaseModel):
@@ -47,6 +63,8 @@ class ForwardingConfig(BaseModel):
     timeout_seconds: float = 5.0
     max_retries: int = 3
     backoff_factor: float = 1.5
+    tls_verify: bool = True
+    tls_ca_bundle: Optional[str] = None
     auth: AuthConfig = Field(default_factory=AuthConfig)
 
     @field_validator("endpoint_url")
@@ -60,11 +78,16 @@ class ForwardingConfig(BaseModel):
 
 class FiltersConfig(BaseModel):
     always_forward_alerts: bool = True
+    suricata_forward_flow: bool = False
+    suricata_forward_dns: bool = True
+    suricata_forward_http: bool = True
+    suricata_forward_tls: bool = True
     zeek_forward_conn: bool = False
     zeek_forward_dns: bool = True
     zeek_forward_http: bool = True
     zeek_forward_ssl: bool = True
     zeek_forward_notice: bool = True
+    dedup_window_seconds: float = 60.0
 
 
 class StateConfig(BaseModel):
