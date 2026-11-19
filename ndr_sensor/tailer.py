@@ -35,6 +35,11 @@ class StateTracker:
             with open(fd, "w", encoding="utf-8") as f:
                 json.dump(self._state, f, indent=2)
             os.replace(temp_file, self.state_file_path)
+        except PermissionError:
+            fallback = os.path.expanduser("~/.cache/pi4-ndr/offset_state.json")
+            if self.state_file_path != fallback:
+                self.state_file_path = fallback
+                self.save()
         except Exception as e:
             logger.error("State save failed: %s", e)
 
