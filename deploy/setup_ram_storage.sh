@@ -18,7 +18,7 @@ mkdir -p "${RAM_MOUNT}" "${ARCHIVE_DIR}"
 
 # 1. Add fstab entry for persistence across reboots
 if ! grep -q "${RAM_MOUNT}" /etc/fstab; then
-    echo "tmpfs ${RAM_MOUNT} tmpfs defaults,noatime,nosuid,nodev,noexec,mode=0750,size=${RAM_SIZE} 0 0" >> /etc/fstab
+    echo "tmpfs ${RAM_MOUNT} tmpfs defaults,noatime,nosuid,nodev,noexec,mode=0755,size=${RAM_SIZE} 0 0" >> /etc/fstab
     echo "[+] Added tmpfs mount to /etc/fstab"
 fi
 

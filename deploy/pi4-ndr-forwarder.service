@@ -31,7 +31,7 @@ RestrictSUIDSGID=true
 RestrictNamespaces=true
 CapabilityBoundingSet=
 ReadWritePaths=/var/lib/pi4-ndr
-ReadOnlyPaths=/var/log/suricata /var/log/zeek /etc/pi4-ndr /opt/pi4-ndr-sensor
+ReadOnlyPaths=/var/log/suricata /var/log/zeek /mnt/sensor_ram /etc/pi4-ndr /opt/pi4-ndr-sensor
 
 [Install]
 WantedBy=multi-user.target

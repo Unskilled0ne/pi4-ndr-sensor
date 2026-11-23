@@ -191,3 +191,17 @@ def test_ioc_enrichment(tmp_path):
     forwarder._enrich_event(bad_event)
     assert bad_event.severity == "high"
     assert "[IOC-MATCH]" in (bad_event.signature or "")
+
+
+def test_endpoint_url_env_override(monkeypatch):
+    monkeypatch.setenv("NDR_ENDPOINT_URL", "http://10.42.0.1:8000/api/v1/alerts/investigate")
+    cfg = AppConfig.load()
+    assert cfg.forwarding.endpoint_url == "http://10.42.0.1:8000/api/v1/alerts/investigate"
+
+
+def test_endpoint_url_template_resolution(monkeypatch):
+    from ndr_sensor.config import ForwardingConfig
+    monkeypatch.setenv("CUSTOM_SOAR", "http://192.168.1.50:9000/alerts")
+    cfg = ForwardingConfig(endpoint_url="${CUSTOM_SOAR}")
+    assert cfg.endpoint_url == "http://192.168.1.50:9000/alerts"
+

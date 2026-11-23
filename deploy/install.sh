@@ -62,6 +62,10 @@ mkdir -p "${CONFIG_DIR}" "${STATE_DIR}" /var/log/suricata /var/log/zeek
 chmod 750 "${CONFIG_DIR}" "${STATE_DIR}"
 chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${STATE_DIR}"
 
+if [ -f "${INSTALL_PREFIX}/deploy/setup_ram_storage.sh" ]; then
+    bash "${INSTALL_PREFIX}/deploy/setup_ram_storage.sh" "256M" || true
+fi
+
 cp "${INSTALL_PREFIX}/config/forwarder.yaml" "${CONFIG_DIR}/forwarder.yaml"
 chmod 640 "${CONFIG_DIR}/forwarder.yaml"
 chown root:"${SERVICE_GROUP}" "${CONFIG_DIR}/forwarder.yaml"

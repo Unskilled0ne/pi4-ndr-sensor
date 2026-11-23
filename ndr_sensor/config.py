@@ -70,10 +70,13 @@ class ForwardingConfig(BaseModel):
     @field_validator("endpoint_url")
     @classmethod
     def validate_url(cls, v: str) -> str:
-        clean = v.strip()
-        if not (clean.startswith("http://") or clean.startswith("https://")):
+        v = v.replace("\r", "").replace("\n", "").strip()
+        if v.startswith("${") and v.endswith("}"):
+            env_var = v[2:-1]
+            v = os.environ.get(env_var, "").strip() or "http://127.0.0.1:8000/api/v1/alerts/investigate"
+        if not (v.startswith("http://") or v.startswith("https://")):
             raise ValueError("endpoint_url must start with http:// or https://")
-        return clean
+        return v
 
 
 class FiltersConfig(BaseModel):
@@ -115,8 +118,12 @@ class AppConfig(BaseModel):
                     path = p
                     break
 
+        data = {}
         if path and os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
                 data = yaml.safe_load(f) or {}
-                return cls(**data)
-        return cls()
+        cfg = cls(**data)
+        env_url = os.getenv("NDR_ENDPOINT_URL") or os.getenv("SOAR_ENDPOINT_URL")
+        if env_url:
+            cfg.forwarding.endpoint_url = env_url
+        return cfg
