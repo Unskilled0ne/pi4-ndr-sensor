@@ -34,7 +34,7 @@ apt-get install -y --no-install-recommends \
     ethtool \
     logrotate
 
-# Install Zeek from official repository (Fix 6)
+# Install Zeek from official repository
 if ! command -v zeek &>/dev/null; then
     echo "[*] Installing Zeek..."
     echo "deb [trusted=yes] https://download.opensuse.org/repositories/security:/zeek/Debian_12/ /" \
@@ -67,7 +67,7 @@ fi
 cp "${INSTALL_PREFIX}/config/suricata.yaml" /etc/suricata/suricata.yaml
 chmod 644 /etc/suricata/suricata.yaml
 
-# Deploy Zeek site-local policy (Fix 7)
+# Deploy Zeek site-local policy
 ZEEK_SITE_DIR=""
 for candidate in /opt/zeek/share/zeek/site /usr/share/zeek/site /usr/local/zeek/share/zeek/site; do
     if [ -d "${candidate}" ]; then
@@ -105,7 +105,7 @@ cp "${INSTALL_PREFIX}/deploy/pi4-ndr-forwarder.service" /etc/systemd/system/
 cp "${INSTALL_PREFIX}/deploy/pi4-ndr-rules-update.service" /etc/systemd/system/
 cp "${INSTALL_PREFIX}/deploy/pi4-ndr-rules-update.timer" /etc/systemd/system/
 
-# Template interface name from config (Fix 20)
+# Template interface name from config
 IFACE=$(grep -oP '(?<=interface: ).*' "${CONFIG_DIR}/forwarder.yaml" 2>/dev/null | tr -d '"' | head -1)
 IFACE="${IFACE:-eth0}"
 sed -i "s/eth0/${IFACE}/g" /etc/systemd/system/promiscuous-tap.service
