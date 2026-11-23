@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/sbin/ip link set eth0 promisc on arp off up
+ExecStart=/sbin/ip link set eth0 promisc on up
 ExecStartPost=-/sbin/ethtool -K eth0 tso off gso off gro off lro off rx off tx off rxvlan off txvlan off
 RemainAfterExit=yes
 

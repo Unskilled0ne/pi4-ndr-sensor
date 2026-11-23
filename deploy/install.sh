@@ -37,10 +37,15 @@ apt-get install -y --no-install-recommends \
 # Install Zeek from official repository
 if ! command -v zeek &>/dev/null; then
     echo "[*] Installing Zeek..."
-    echo "deb [trusted=yes] https://download.opensuse.org/repositories/security:/zeek/Debian_12/ /" \
+    DEBIAN_VER="12"
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DEBIAN_VER="${VERSION_ID:-12}"
+    fi
+    echo "deb [trusted=yes] https://download.opensuse.org/repositories/security:/zeek/Debian_${DEBIAN_VER}/ /" \
         > /etc/apt/sources.list.d/zeek.list
     apt-get update -y
-    apt-get install -y --no-install-recommends zeek-lts || {
+    apt-get install -y --no-install-recommends zeek-lts || apt-get install -y --no-install-recommends zeek || {
         echo "[!] Zeek package install failed. Install manually from https://zeek.org/get-zeek/"
         echo "[!] Continuing without Zeek..."
     }
