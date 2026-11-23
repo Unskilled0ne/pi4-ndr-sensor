@@ -52,6 +52,12 @@ if ! command -v zeek &>/dev/null; then
     }
 fi
 
+for b in zeek zeekctl zkg; do
+    if [ -x "/opt/zeek/bin/${b}" ] && [ ! -e "/usr/local/bin/${b}" ]; then
+        ln -s "/opt/zeek/bin/${b}" "/usr/local/bin/${b}"
+    fi
+done
+
 mkdir -p "${INSTALL_PREFIX}"
 cp -r "${PROJECT_DIR}"/* "${INSTALL_PREFIX}/"
 

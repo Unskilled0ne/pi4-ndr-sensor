@@ -7,17 +7,14 @@
 
 redef LogAscii::use_json = T;
 
-# JA3 TLS Client/Server Fingerprinting
-@load policy/protocols/ssl/ja3
-
-redef disable_analyzer += {
-    PacketAnalyzer::ANALYZER_SMB,
-    PacketAnalyzer::ANALYZER_KERBEROS,
-    PacketAnalyzer::ANALYZER_DCE_RPC,
-    PacketAnalyzer::ANALYZER_RADIUS,
-    PacketAnalyzer::ANALYZER_RDP,
-    PacketAnalyzer::ANALYZER_SNMP,
-    PacketAnalyzer::ANALYZER_SIP
+redef Analyzer::disabled_analyzers += {
+    Analyzer::ANALYZER_SMB,
+    Analyzer::ANALYZER_KRB,
+    Analyzer::ANALYZER_DCE_RPC,
+    Analyzer::ANALYZER_RADIUS,
+    Analyzer::ANALYZER_RDP,
+    Analyzer::ANALYZER_SNMP,
+    Analyzer::ANALYZER_SIP
 };
 
 redef tcp_inactivity_timeout = 60 secs;

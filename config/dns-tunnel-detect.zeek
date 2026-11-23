@@ -16,7 +16,7 @@ export {
 event dns_request(c: connection, msg: dns_msg, query: string, qtype: count, qclass: count) {
     if ( |query| > max_query_length ) {
         # Exclude standard in-addr.arpa / ip6.arpa reverse lookups
-        if ( ! (query in /\.arpa$/) ) {
+        if ( ! (/\.arpa$/ in query) ) {
             NOTICE([
                 $note=DNS_Tunnel_Suspicious_Query,
                 $msg=fmt("Oversized DNS query detected (%d bytes): %s", |query|, query),
