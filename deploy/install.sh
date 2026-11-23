@@ -66,8 +66,9 @@ python3 -m venv "${INSTALL_PREFIX}/venv"
 "${INSTALL_PREFIX}/venv/bin/pip" install -r "${INSTALL_PREFIX}/requirements.txt"
 
 mkdir -p "${CONFIG_DIR}" "${STATE_DIR}" /var/log/suricata /var/log/zeek
-chmod 750 "${CONFIG_DIR}" "${STATE_DIR}"
 chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "${STATE_DIR}"
+chown root:"${SERVICE_GROUP}" "${CONFIG_DIR}"
+chmod 750 "${CONFIG_DIR}" "${STATE_DIR}"
 
 if [ -f "${INSTALL_PREFIX}/deploy/setup_ram_storage.sh" ]; then
     bash "${INSTALL_PREFIX}/deploy/setup_ram_storage.sh" "256M" || true
