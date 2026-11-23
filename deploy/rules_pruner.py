@@ -45,6 +45,14 @@ def prune_rules(
 
     selected_rules: List[str] = []
     rule_regex = re.compile(r"^\s*alert\s+", re.IGNORECASE)
+    known_vars = {
+        "HOME_NET", "EXTERNAL_NET", "HTTP_SERVERS", "SMTP_SERVERS", "SQL_SERVERS",
+        "DNS_SERVERS", "TELNET_SERVERS", "AIM_SERVERS", "DC_SERVERS", "DNP3_SERVER",
+        "DNP3_CLIENT", "MODBUS_CLIENT", "MODBUS_SERVER", "ENIP_CLIENT", "ENIP_SERVER",
+        "HTTP_PORTS", "SHELLCODE_PORTS", "ORACLE_PORTS", "SSH_PORTS", "DNP3_PORTS",
+        "MODBUS_PORTS", "FILE_DATA_PORTS", "FTP_PORTS", "GENEVE_PORTS", "VXLAN_PORTS",
+        "TEREDO_PORTS", "SIP_PORTS"
+    }
 
     def process_rule_file(filename: str, content: str):
         base_cat = os.path.basename(filename).replace(".rules", "")
@@ -56,6 +64,10 @@ def prune_rules(
             line_strip = line.strip()
             if rule_regex.match(line_strip):
                 stats["total_rules_read"] += 1
+                header = line_strip.split("(", 1)[0]
+                vars_in_header = re.findall(r"\$([A-Za-z0-9_]+)", header)
+                if any(v.upper() not in known_vars for v in vars_in_header):
+                    continue
                 if len(selected_rules) < max_rules:
                     selected_rules.append(line_strip)
                     stats["categories"][base_cat] = stats["categories"].get(base_cat, 0) + 1
