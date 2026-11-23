@@ -1,0 +1,18 @@
+[Unit]
+Description=Zeek Network Security Monitor
+After=network.target promiscuous-tap.service
+Wants=promiscuous-tap.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/log/zeek
+ExecStartPre=/bin/mkdir -p /var/log/zeek
+ExecStartPre=/bin/ln -snf . /var/log/zeek/current
+ExecStart=/usr/local/bin/zeek -i eth0 /opt/zeek/share/zeek/site/local.zeek
+Restart=always
+RestartSec=5
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

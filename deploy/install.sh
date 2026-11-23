@@ -121,11 +121,17 @@ cp "${INSTALL_PREFIX}/deploy/promiscuous-tap.service" /etc/systemd/system/
 cp "${INSTALL_PREFIX}/deploy/pi4-ndr-forwarder.service" /etc/systemd/system/
 cp "${INSTALL_PREFIX}/deploy/pi4-ndr-rules-update.service" /etc/systemd/system/
 cp "${INSTALL_PREFIX}/deploy/pi4-ndr-rules-update.timer" /etc/systemd/system/
+if [ -f "${INSTALL_PREFIX}/deploy/zeek.service" ]; then
+    cp "${INSTALL_PREFIX}/deploy/zeek.service" /etc/systemd/system/
+fi
 
 # Template interface name from config
 IFACE=$(grep -oP '(?<=interface: ).*' "${CONFIG_DIR}/forwarder.yaml" 2>/dev/null | tr -d '"' | head -1)
 IFACE="${IFACE:-eth0}"
 sed -i "s/eth0/${IFACE}/g" /etc/systemd/system/promiscuous-tap.service
+if [ -f /etc/systemd/system/zeek.service ]; then
+    sed -i "s/eth0/${IFACE}/g" /etc/systemd/system/zeek.service
+fi
 
 systemctl daemon-reload
 systemctl enable promiscuous-tap.service
