@@ -23,7 +23,7 @@ state:
   offset_file: "/var/lib/pi4-ndr/offset_state.json"
 
 forwarding:
-  endpoint_url: "http://127.0.0.1:8000/api/v1/alerts/investigate"
+  endpoint_url: "http://10.42.0.1:8000/api/v1/alerts/investigate"
   mode: "aegis_soar"
   batch_size: 50
   max_queue_size: 5000
